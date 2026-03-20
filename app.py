@@ -1,38 +1,35 @@
 import streamlit as st
 import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
 
 st.title("🏋️‍♂️ Mi Diario de Progreso")
 
-# Configuración básica
-url = "TU_URL_DE_GOOGLE_SHEETS_AQUI"
+# 1. TU URL (Asegúrate de que sea la de tu navegador)
+url_original = "TU_URL_DE_GOOGLE_SHEETS_AQUI"
 
-# Intentar conectar de forma simple
+# 2. TRUCO DE PROGRAMADOR: Convertimos la URL para descarga directa
+# Esto reemplaza el final de la URL para que Google nos entregue los datos directo
+if "/edit" in url_original:
+    url_csv = url_original.split("/edit")[0] + "/gviz/tq?tqx=out:csv"
+else:
+    url_csv = url_original
+
 try:
-    # 1. Conexión simplificada
-    gc = gspread.service_account_from_dict({}) # Ignora los errores de permiso aquí
-    # Usamos el cliente directo de gspread
-    sh = gspread.open_by_url(url)
-    worksheet = sh.get_worksheet(0)
+    # 3. LEER LOS DATOS (Esto no pide permisos si está 'Cualquier persona con el enlace')
+    df = pd.read_csv(url_csv)
     
-    st.success("✅ ¡Conectado con éxito!")
+    st.success("✅ ¡Conectado y datos leídos!")
     
-    # 2. Leer datos
-    data = worksheet.get_all_records()
-    if data:
-        df = pd.DataFrame(data)
+    if not df.empty:
         st.write("Tu historial:")
-        st.table(df) # st.table se ve más limpio para pocos datos
+        st.dataframe(df)
     else:
-        st.info("La hoja está vacía. ¡Registra tu primer peso!")
+        st.info("La hoja está vacía.")
 
 except Exception as e:
-    # Este es el truco: si falla lo anterior, intentamos abrirlo de forma anónima
-    try:
-        gc = gspread.authorize(None)
-        sh = gc.open_by_url(url)
-        worksheet = sh.get_worksheet(0)
-        st.success("✅ Conectado (Modo Anónimo)")
-    except:
-        st.error("Error: Asegúrate de que en Google Sheets pusiste 'Cualquier persona con el enlace' -> 'EDITOR'")
+    st.error(f"No pudimos leer los datos: {e}")
+    st.info("Revisa que el enlace sea correcto y público.")
+
+# 4. Formulario de registro (Visual)
+peso = st.number_input("Peso de hoy (kg)", value=70.0)
+if st.button("Guardar"):
+    st.warning("Para guardar datos automáticamente con este método simple, necesitamos un paso extra. ¡Primero confirmemos que puedes VER tus datos!")
