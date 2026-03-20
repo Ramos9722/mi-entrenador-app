@@ -6,7 +6,7 @@ st.set_page_config(page_title="Family Fitness Hub 🇵🇪", page_icon="👨‍�
 
 # --- 1. CONFIGURACIÓN DE LA FAMILIA ---
 # Agrega aquí los nombres de todos tus familiares
-familia = [Anderson, Emerson, Jhon, Nelida, Sharon]
+familia = ["Seleccionar...", "Anderson", "Emerson", "Jhon", "Nelida", "Sharon"]
 
 alimentos_peru = {
     "huevo": {"cal": 78, "prot": 6.3, "medida": "unidad"},
