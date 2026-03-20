@@ -1,48 +1,53 @@
-import streamlit as st # Importamos la herramienta de sitios web
+import streamlit as st
 
-# Configuración de la página
-st.set_page_config(page_title="Mi Entrenador AI", page_icon="💪")
+st.set_page_config(page_title="Coach AI Pro", page_icon="⚖️")
 
-st.title("🏋️‍♂️ Mi Entrenador & Nutricionista")
-st.write("Registra tus datos para obtener tu plan personalizado.")
+st.title("⚖️ Mi Coach de Transformación")
 
-# --- Formulario en la barra lateral ---
+# --- Nueva entrada de datos más precisa ---
 with st.sidebar:
-    st.header("Tus Datos")
-    peso = st.number_input("Peso (kg)", min_value=40.0, max_value=200.0, value=70.0)
-    altura = st.number_input("Altura (cm)", min_value=100, max_value=250, value=170)
-    edad = st.number_input("Edad", min_value=15, max_value=100, value=25)
-    objetivo = st.selectbox("Tu objetivo", ["Bajar de peso", "Mantener peso", "Ganar músculo"])
+    st.header("Perfil de Usuario")
+    genero = st.radio("Género", ["Hombre", "Mujer"])
+    peso = st.number_input("Peso actual (kg)", value=70.0)
+    altura = st.number_input("Altura (cm)", value=170)
+    edad = st.number_input("Edad", value=25)
+    
+    actividad = st.select_slider(
+        "Nivel de actividad",
+        options=["Sedentario", "Ligero", "Moderado", "Intenso"]
+    )
 
-# --- Lógica de Cálculos ---
-tmb = (10 * peso) + (6.25 * altura) - (5 * edad) + 5
-
-if objetivo == "Bajar de peso":
-    calorias_finales = tmb - 500
-    dieta_tipo = "Baja en carbohidratos, alta en proteína."
-    rutina_tipo = "Cardio 30 min + Pesas ligeras (15 reps)."
-elif objetivo == "Ganar músculo":
-    calorias_finales = tmb + 300
-    dieta_tipo = "Alta en proteína y carbohidratos complejos."
-    rutina_tipo = "Pesas pesadas (8 reps) + Descanso activo."
+# --- Lógica de cálculo avanzada (Mifflin-St Jeor) ---
+if genero == "Hombre":
+    tmb = (10 * peso) + (6.25 * altura) - (5 * edad) + 5
 else:
-    calorias_finales = tmb
-    dieta_tipo = "Balanceada."
-    rutina_tipo = "Caminata 10k pasos + Fuerza general."
+    tmb = (10 * peso) + (6.25 * altura) - (5 * edad) - 161
 
-# --- Mostrar Resultados en la Web ---
-st.subheader(f"🔥 Tu objetivo diario: {int(calorias_finales)} calorías")
+# Ajuste por actividad
+multiplicadores = {"Sedentario": 1.2, "Ligero": 1.375, "Moderado": 1.55, "Intenso": 1.725}
+calorias_mantenimiento = tmb * multiplicadores[actividad]
+calorias_perder_peso = calorias_mantenimiento - 500
 
-col1, col2 = st.columns(2)
+# --- Mostrar resultados ---
+st.metric(label="Calorías para bajar de peso", value=f"{int(calorias_perder_peso)} kcal")
 
+# --- Generador de Lista de Compras ---
+st.subheader("🛒 Lista de compras recomendada")
+lista_compras = {
+    "Proteínas": ["Pechuga de pollo", "Huevos", "Tofu", "Pescado blanco"],
+    "Carbohidratos": ["Avena", "Arroz integral", "Camote (Batata)"],
+    "Grasas": ["Aguacate", "Nueces", "Aceite de oliva"]
+}
+
+col1, col2, col3 = st.columns(3)
 with col1:
-    st.info("🍎 **Dieta Sugerida**")
-    st.write(dieta_tipo)
-
+    st.write("**Proteínas**")
+    for p in lista_compras["Proteínas"]: st.write(f"- {p}")
 with col2:
-    st.success("💪 **Rutina Sugerida**")
-    st.write(rutina_tipo)
+    st.write("**Carbos**")
+    for c in lista_compras["Carbohidratos"]: st.write(f"- {c}")
+with col3:
+    st.write("**Grasas**")
+    for g in lista_compras["Grasas"]: st.write(f"- {g}")
 
-# Botón para guardar progreso (Simulado por ahora)
-if st.button("Guardar progreso de hoy"):
-    st.write(f"Guardado: {peso}kg el día de hoy. ¡Sigue así!")
+st.info("💡 Consejo: Bebe 35ml de agua por cada kilo de peso.")
