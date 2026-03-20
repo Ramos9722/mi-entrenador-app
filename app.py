@@ -10,25 +10,29 @@ url = "TU_URL_DE_GOOGLE_SHEETS_AQUI"
 
 # Intentar conectar de forma simple
 try:
-    # Esto leerá la hoja si es pública (Cualquier persona con el enlace -> Editor)
-    gc = gspread.public_sheets() 
-    sh = gc.open_by_url(url)
+    # 1. Conexión simplificada
+    gc = gspread.service_account_from_dict({}) # Ignora los errores de permiso aquí
+    # Usamos el cliente directo de gspread
+    sh = gspread.open_by_url(url)
     worksheet = sh.get_worksheet(0)
     
-    st.success("✅ Conectado a Google Sheets")
+    st.success("✅ ¡Conectado con éxito!")
     
-    # Mostrar datos
+    # 2. Leer datos
     data = worksheet.get_all_records()
-    df = pd.DataFrame(data)
-    st.write("Tu historial:")
-    st.dataframe(df)
+    if data:
+        df = pd.DataFrame(data)
+        st.write("Tu historial:")
+        st.table(df) # st.table se ve más limpio para pocos datos
+    else:
+        st.info("La hoja está vacía. ¡Registra tu primer peso!")
 
 except Exception as e:
-    st.error(f"Error de conexión: {e}")
-    st.info("Asegúrate de que tu Google Sheet sea PÚBLICA (Cualquier persona con el enlace -> Editor)")
-
-# Formulario simple
-peso = st.number_input("Peso (kg)", value=70.0)
-if st.button("Guardar"):
-    worksheet.append_row([str(pd.Timestamp.now()), peso])
-    st.rerun()
+    # Este es el truco: si falla lo anterior, intentamos abrirlo de forma anónima
+    try:
+        gc = gspread.authorize(None)
+        sh = gc.open_by_url(url)
+        worksheet = sh.get_worksheet(0)
+        st.success("✅ Conectado (Modo Anónimo)")
+    except:
+        st.error("Error: Asegúrate de que en Google Sheets pusiste 'Cualquier persona con el enlace' -> 'EDITOR'")
