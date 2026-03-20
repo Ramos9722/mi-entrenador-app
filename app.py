@@ -76,4 +76,4 @@ if not df.empty:
         st.bar_chart(data=df_grafica, x="Fecha", y="Proteinas")
 
     with tab2:
-        st.dataframe(df))
+        st.dataframe(df)
