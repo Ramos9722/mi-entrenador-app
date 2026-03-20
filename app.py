@@ -1,42 +1,34 @@
 import streamlit as st
-from st_gsheets_connection import GSheetsConnection
 import pandas as pd
-from datetime import date
+import gspread
+from google.oauth2.service_account import Credentials
 
-st.set_page_config(page_title="Coach AI Pro", page_icon="⚖️")
-st.title("⚖️ Mi Registro de Progreso")
+st.title("🏋️‍♂️ Mi Diario de Progreso")
 
-# 1. Conexión con Google Sheets
-url = "https://docs.google.com/spreadsheets/d/1lCJoaHAaE_lmXbQUGp5ZKNp0HDzd3IJxKWQk19BgWhc/edit?usp=sharing" # <--- PEGA TU URL AQUÍ
-conn = st.connection("gsheets", type=GSheetsConnection)
+# Configuración básica
+url = "TU_URL_DE_GOOGLE_SHEETS_AQUI"
 
-# 2. Entradas de datos
-with st.sidebar:
-    st.header("Registro Diario")
-    fecha_hoy = date.today()
-    peso_hoy = st.number_input("Peso de hoy (kg)", value=70.0)
-    calorias_hoy = st.number_input("Calorías consumidas", value=2000)
+# Intentar conectar de forma simple
+try:
+    # Esto leerá la hoja si es pública (Cualquier persona con el enlace -> Editor)
+    gc = gspread.public_sheets() 
+    sh = gc.open_by_url(url)
+    worksheet = sh.get_worksheet(0)
     
-    boton_guardar = st.button("Guardar mi progreso")
-
-# 3. Lógica para guardar datos
-if boton_guardar:
-    # Leemos los datos actuales
-    data_actual = conn.read(spreadsheet=url)
+    st.success("✅ Conectado a Google Sheets")
     
-    # Creamos la nueva fila
-    nueva_fila = pd.DataFrame([{
-        "Fecha": str(fecha_hoy),
-        "Peso": peso_hoy,
-        "Calorias": calorias_hoy
-    }])
-    
-    # Unimos y guardamos
-    data_actualizada = pd.concat([data_actual, nueva_fila], ignore_index=True)
-    conn.update(spreadsheet=url, data=data_actualizada)
-    st.success("¡Datos guardados en Google Sheets!")
+    # Mostrar datos
+    data = worksheet.get_all_records()
+    df = pd.DataFrame(data)
+    st.write("Tu historial:")
+    st.dataframe(df)
 
-# 4. Mostrar el historial
-st.subheader("Tu historial guardado")
-datos_vistos = conn.read(spreadsheet=url)
-st.dataframe(datos_vistos)
+except Exception as e:
+    st.error(f"Error de conexión: {e}")
+    st.info("Asegúrate de que tu Google Sheet sea PÚBLICA (Cualquier persona con el enlace -> Editor)")
+
+# Formulario simple
+peso = st.number_input("Peso (kg)", value=70.0)
+if st.button("Guardar"):
+    worksheet.append_row([str(pd.Timestamp.now()), peso])
+    st.rerun()
