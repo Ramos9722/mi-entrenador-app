@@ -4,7 +4,7 @@ import pandas as pd
 st.title("🏋️‍♂️ Mi Diario de Progreso")
 
 # 1. TU URL (Asegúrate de que sea la de tu navegador)
-url_original = "TU_URL_DE_GOOGLE_SHEETS_AQUI"
+url_original = "https://docs.google.com/spreadsheets/d/1lCJoaHAaE_lmXbQUGp5ZKNp0HDzd3IJxKWQk19BgWhc/edit?gid=0#gid=0"
 
 # 2. TRUCO DE PROGRAMADOR: Convertimos la URL para descarga directa
 # Esto reemplaza el final de la URL para que Google nos entregue los datos directo
