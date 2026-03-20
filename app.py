@@ -145,7 +145,7 @@ if usuario_activo != "Seleccionar...":
             st.bar_chart(data=df_u_graf, x="Fecha", y=["Proteinas", "Vasos_Agua"])
 else:
     st.info("👋 ¡Hola! Por favor selecciona un miembro de la familia para empezar su entrenamiento.")
-            st.write("Aún no tienes registros personales.")
+    st.write("Aún no tienes registros personales.")
 
 else:
     st.info("Por favor, selecciona un perfil para comenzar.")
