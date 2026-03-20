@@ -7,7 +7,7 @@ st.set_page_config(page_title="Coach AI Pro", page_icon="⚖️")
 st.title("⚖️ Mi Registro de Progreso")
 
 # 1. Conexión con Google Sheets
-url = "https://docs.google.com/spreadsheets/d/1lCJoaHAaE_lmXbQUGp5ZKNp0HDzd3IJxKWQk19BgWhc/edit?gid=0#gid=0" # <--- PEGA TU URL AQUÍ
+url = "https://docs.google.com/spreadsheets/d/1lCJoaHAaE_lmXbQUGp5ZKNp0HDzd3IJxKWQk19BgWhc/edit?usp=sharing" # <--- PEGA TU URL AQUÍ
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # 2. Entradas de datos
