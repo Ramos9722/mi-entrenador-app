@@ -3,18 +3,17 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 import time
 import random
-from datetime import datetime
+from datetime import datetime, timedelta
 
-# 1. CONFIGURACIÓN DE PÁGINA
-st.set_page_config(page_title="Family Coach IA Total", page_icon="🤖", layout="wide")
+# 1. CONFIGURACIÓN
+st.set_page_config(page_title="Family Coach IA Pro v7", page_icon="🤖", layout="wide")
 
-# 2. PERFILES (Corregido Sharon 1.40m y Metas)
 perfiles = {
-    "Anderson": {"estatura": 1.57, "edad": 22, "nivel": "Elite", "cal_meta": 2200, "agua_meta": 10},
-    "Emerson": {"estatura": 1.57, "edad": 22, "nivel": "Elite", "cal_meta": 2200, "agua_meta": 10},
-    "Jhon": {"estatura": 1.70, "edad": 41, "nivel": "Adulto", "cal_meta": 2000, "agua_meta": 8},
-    "Nelida": {"estatura": 1.54, "edad": 51, "nivel": "Adulto", "cal_meta": 1600, "agua_meta": 7},
-    "Sharon": {"estatura": 1.40, "edad": 11, "nivel": "Junior", "cal_meta": 1800, "agua_meta": 7}
+    "Anderson": {"estatura": 1.57, "edad": 22, "nivel": "Elite", "cal_meta": 2200, "agua_meta": 10, "prot_meta": 110},
+    "Emerson": {"estatura": 1.57, "edad": 22, "nivel": "Elite", "cal_meta": 2200, "agua_meta": 10, "prot_meta": 110},
+    "Jhon": {"estatura": 1.70, "edad": 41, "nivel": "Adulto", "cal_meta": 2000, "agua_meta": 8, "prot_meta": 100},
+    "Nelida": {"estatura": 1.54, "edad": 51, "nivel": "Adulto", "cal_meta": 1600, "agua_meta": 7, "prot_meta": 80},
+    "Sharon": {"estatura": 1.40, "edad": 11, "nivel": "Junior", "cal_meta": 1800, "agua_meta": 7, "prot_meta": 70}
 }
 
 alimentos_peru = {
@@ -24,44 +23,20 @@ alimentos_peru = {
     "menestra": {"cal": 230, "prot": 15, "medida": "porcion"},
     "pan frances": {"cal": 85, "prot": 2.5, "medida": "unidad"},
     "camote": {"cal": 115, "prot": 1.3, "medida": "unidad"},
-    "jugo de papaya": {"cal": 120, "prot": 1, "medida": "vaso"},
-    "papa": {"cal": 90, "prot": 2, "medida": "unidad"},
-    "leche": {"cal": 150, "prot": 8, "medida": "taza"}
+    "papa": {"cal": 90, "prot": 2, "medida": "unidad"}
 }
 
-banco_ejercicios = {
-    "Elite": [
-        {"n": "Burpees Explosivos", "t": "reps", "v": 20, "d": 15, "icon": "🤸‍♂️", "guia": "Pecho al suelo y salto máximo."},
-        {"n": "Flexiones Diamante", "t": "reps", "v": 15, "d": 15, "icon": "💎", "guia": "Manos juntas en forma de diamante."},
-        {"n": "Sentadilla Búlgara", "t": "reps", "v": 12, "d": 20, "icon": "🍗", "guia": "Un pie en silla, baja cadera recta."},
-        {"n": "Plancha Militar", "t": "tiempo", "v": 60, "d": 10, "icon": "🧗", "guia": "Sube y baja de antebrazos a manos."},
-        {"n": "Zancadas con salto", "t": "reps", "v": 20, "d": 15, "icon": "💥", "guia": "Cambio de pierna explosivo en el aire."}
-    ],
-    "Adulto": [
-        {"n": "Sentadilla en Pared", "t": "tiempo", "v": 45, "d": 30, "icon": "🧱", "guia": "90 grados. Espalda plana en pared."},
-        {"n": "Flexiones Inclinadas", "t": "reps", "v": 12, "d": 40, "icon": "🆙", "guia": "Manos en mesa alta o pared."},
-        {"n": "Puente de Glúteo", "t": "reps", "v": 20, "d": 30, "icon": "🍑", "guia": "Aprieta glúteos arriba 2 segundos."},
-        {"n": "Caminata Rodillas Altas", "t": "tiempo", "v": 60, "d": 30, "icon": "🏃", "guia": "Braceo rítmico. Espalda derecha."}
-    ],
-    "Junior": [
-        {"n": "Salto de Cuerda", "t": "tiempo", "v": 60, "d": 20, "icon": "➰", "guia": "Saltos cortos sobre puntas."},
-        {"n": "Skipping Veloz", "t": "tiempo", "v": 40, "d": 20, "icon": "⚡", "guia": "Rodillas arriba muy rápido."},
-        {"n": "Jumping Jacks", "t": "reps", "v": 30, "d": 20, "icon": "👐", "guia": "Abre y cierra brazos y piernas a la vez."}
-    ]
-}
-
-# --- 3. LÓGICA DE SESIÓN ---
+# --- LÓGICA DE SESIÓN ---
 if 'ejercicio_actual' not in st.session_state: st.session_state.ejercicio_actual = 0
 if 'entrenando' not in st.session_state: st.session_state.entrenando = False
-if 'fase' not in st.session_state: st.session_state.fase = "Calentamiento"
 if 'carrito_comida' not in st.session_state: st.session_state.carrito_comida = []
 if 'rutina_dia' not in st.session_state: st.session_state.rutina_dia = []
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 df_total = conn.read()
 
-# --- 4. INTERFAZ ---
-st.title("👨‍👩‍👧‍👦 Family Fitness Hub Pro")
+# --- INTERFAZ ---
+st.title("👨‍👩‍👧‍👦 Family Fitness Hub: Inteligencia Nutricional")
 usuario = st.selectbox("👤 ¿Quién eres?", ["Seleccionar..."] + list(perfiles.keys()))
 
 if usuario != "Seleccionar...":
@@ -70,71 +45,96 @@ if usuario != "Seleccionar...":
     
     # Datos históricos
     if not df_total.empty and 'Usuario' in df_total.columns:
-        df_usuario = df_total[df_total['Usuario'] == usuario]
+        df_usuario = df_total[df_total['Usuario'] == usuario].copy()
+        df_usuario['Fecha'] = pd.to_datetime(df_usuario['Fecha'])
         ultimo_peso = df_usuario['Peso'].iloc[-1] if not df_usuario.empty else 60.0
     else:
         df_usuario = pd.DataFrame(); ultimo_peso = 60.0
 
-    # Menú Lateral
-    opcion = st.sidebar.radio("Ir a:", ["🍎 Nutrición y Peso", "💪 Entrenamiento IA Pro"])
+    opcion = st.sidebar.radio("Ir a:", ["🍎 Nutrición Inteligente", "💪 Entrenamiento IA Pro"])
 
-    # --- SECCIÓN NUTRICIÓN ---
-    if opcion == "🍎 Nutrición y Peso":
-        st.header(f"Gestión Nutricional - {usuario}")
+    if opcion == "🍎 Nutrición Inteligente":
+        st.header(f"Panel de Salud - {usuario}")
         
+        # 1. ANALIZADOR DE TENDENCIAS (IA DE PESO)
+        if len(df_usuario) > 1:
+            peso_inicial = df_usuario['Peso'].iloc[-7] if len(df_usuario) >= 7 else df_usuario['Peso'].iloc[0]
+            diferencia = ultimo_peso - peso_inicial
+            if diferencia < 0:
+                st.info(f"📈 **Tendencia Semanal:** Has bajado {abs(diferencia):.2f} kg. ¡Excelente progreso!")
+            elif diferencia > 0:
+                st.warning(f"📈 **Tendencia Semanal:** Has subido {diferencia:.2f} kg. Revisa tu ingesta de calorías.")
+            else:
+                st.info("📈 **Tendencia Semanal:** Tu peso se mantiene estable.")
+
+        # 2. MÉTRICAS DE PROTEÍNA Y CALORÍAS
         cal_consumidas = sum(item['c'] for item in st.session_state.carrito_comida)
-        cal_restantes = datos_p['cal_meta'] - cal_consumidas
+        prot_consumida = sum(item['p'] for item in st.session_state.carrito_comida)
         
         m1, m2, m3 = st.columns(3)
-        if cal_consumidas > datos_p['cal_meta']:
-            exceso = int(cal_consumidas - datos_p['cal_meta'])
-            m1.metric("🔥 Calorías Hoy", f"{int(cal_consumidas)} kcal", f"Exceso: {exceso}", delta_color="inverse")
-            st.error(f"⚠️ ¡Cuidado {usuario}! Has superado tu meta por {exceso} kcal.")
-        else:
-            m1.metric("🍎 Calorías Hoy", f"{int(cal_consumidas)} kcal", f"Faltan: {int(cal_restantes)}")
-        m2.metric("🎯 Tu Meta", f"{datos_p['cal_meta']} kcal")
-        m3.metric("💧 Meta Agua", f"{datos_p['agua_meta']} vasos")
+        m1.metric("🔥 Calorías", f"{int(cal_consumidas)} / {datos_p['cal_meta']} kcal")
+        
+        # Semáforo de Proteína
+        color_prot = "normal" if prot_consumida >= datos_p['prot_meta'] else "inverse"
+        m2.metric("🥩 Proteína", f"{int(prot_consumida)}g", f"Meta: {datos_p['prot_meta']}g", delta_color=color_prot)
+        
+        m3.metric("💧 Agua", f"Meta: {datos_p['agua_meta']} vasos")
 
         st.divider()
 
         col_in, col_res = st.columns([1, 1.2])
         with col_in:
-            with st.expander("📝 Añadir al Plato", expanded=True):
-                mom = st.selectbox("Momento:", ["Desayuno", "Almuerzo", "Cena", "Snack"])
-                com = st.selectbox("Alimento:", list(alimentos_peru.keys()))
+            st.subheader("📝 Registro Diario")
+            
+            # Opción Alimento Personalizado
+            tipo_ingreso = st.radio("Tipo de ingreso:", ["Lista Peruana", "Alimento Personalizado"], horizontal=True)
+            
+            if tipo_ingreso == "Lista Peruana":
+                com = st.selectbox("Selecciona:", list(alimentos_peru.keys()))
                 can = st.number_input(f"Cantidad ({alimentos_peru[com]['medida']})", min_value=0.5, step=0.5)
                 if st.button("➕ Añadir"):
                     info = alimentos_peru[com]
-                    st.session_state.carrito_comida.append({"m": mom, "n": com, "c": info["cal"] * can, "p": info["prot"] * can})
+                    st.session_state.carrito_comida.append({"n": com, "c": info["cal"] * can, "p": info["prot"] * can})
                     st.rerun()
-            
-            v_agua = st.slider(f"Vasos tomados (Meta: {datos_p['agua_meta']})", 0, 15, 0)
-            if v_agua >= datos_p['agua_meta']:
-                st.success(f"✅ Meta de agua alcanzada ({v_agua}/{datos_p['agua_meta']})")
             else:
-                st.warning(f"🚰 Te faltan {datos_p['agua_meta'] - v_agua} vasos.")
+                n_personal = st.text_input("Nombre del alimento:")
+                c_personal = st.number_input("Calorías (kcal):", min_value=0)
+                p_personal = st.number_input("Proteína (g):", min_value=0)
+                if st.button("➕ Añadir Personalizado"):
+                    if n_personal:
+                        st.session_state.carrito_comida.append({"n": n_personal, "c": c_personal, "p": p_personal})
+                        st.rerun()
 
-            n_peso = st.number_input("⚖️ Peso actual (kg):", value=float(ultimo_peso), step=0.1)
-            f_reg = st.date_input("📅 Fecha:", datetime.now())
+            st.divider()
+            v_agua = st.slider("Vasos de agua:", 0, 15, 0)
+            n_peso = st.number_input("⚖️ PESO ACTUAL (kg):", value=float(ultimo_peso), step=0.1)
+            f_reg = st.date_input("📅 FECHA:", datetime.now())
+
+            # CORRECCIÓN: Botón de Guardado siempre visible y funcional
+            if st.button("💾 GUARDAR TODO EL DÍA (Sincronizar)", use_container_width=True, type="primary"):
+                nueva_fila = pd.DataFrame({
+                    "Usuario": [usuario], "Fecha": [str(f_reg)], "Peso": [n_peso],
+                    "Calorias": [cal_consumidas], "Proteinas": [prot_consumida],
+                    "Detalle": [", ".join([i['n'] for i in st.session_state.carrito_comida]) if st.session_state.carrito_comida else "Solo Peso/Agua"],
+                    "Vasos_Agua": [v_agua]
+                })
+                df_final = pd.concat([df_total, nueva_fila], ignore_index=True)
+                conn.update(data=df_final)
+                st.session_state.carrito_comida = [] # Limpiar plato
+                st.success("✅ ¡Datos guardados en la nube con éxito!")
+                time.sleep(1)
+                st.rerun()
 
         with col_res:
-            st.subheader("🍽️ Resumen del Plato")
+            st.subheader("🍽️ Tu Plato de Hoy")
             if st.session_state.carrito_comida:
                 temp_df = pd.DataFrame(st.session_state.carrito_comida)
-                st.dataframe(temp_df.rename(columns={'m':'Momento','n':'Alimento','c':'kcal','p':'Prot(g)'}), use_container_width=True)
-                total_p = temp_df['p'].sum()
-                if st.button("💾 GUARDAR DÍA COMPLETO"):
-                    nueva_fila = pd.DataFrame({
-                        "Usuario": [usuario], "Fecha": [str(f_reg)], "Peso": [n_peso],
-                        "Calorias": [cal_consumidas], "Proteinas": [total_p],
-                        "Detalle": [", ".join(temp_df['n'])], "Vasos_Agua": [v_agua]
-                    })
-                    df_final = pd.concat([df_total, nueva_fila], ignore_index=True)
-                    conn.update(data=df_final)
+                st.dataframe(temp_df.rename(columns={'n':'Alimento','c':'kcal','p':'Prot(g)'}), use_container_width=True)
+                if st.button("🗑️ Vaciar Plato"):
                     st.session_state.carrito_comida = []
-                    st.success("¡Datos guardados!")
                     st.rerun()
-            else: st.info("Plato vacío.")
+            else:
+                st.info("No hay alimentos en el plato. Puedes guardar solo tu peso si lo deseas.")
 
     # --- SECCIÓN ENTRENAMIENTO ---
     elif opcion == "💪 Entrenamiento IA Pro":
