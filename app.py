@@ -82,60 +82,99 @@ if usuario != "Seleccionar...":
     # --- SECCIÓN NUTRICIÓN ---
     if opcion == "🍎 Nutrición e IA de Peso":
         st.header(f"Gestión de Salud - {usuario}")
+
+        # --- INICIALIZACIÓN DE MEMORIA TEMPORAL (Si no existe) ---
+        if f'agua_hoy_{usuario}' not in st.session_state:
+            st.session_state[f'agua_hoy_{usuario}'] = 0
         
-        # IA de Tendencia
+        # --- TENDENCIA Y MÉTRICAS ---
         if len(df_u) >= 2:
             dif = df_u['Peso'].iloc[-1] - df_u['Peso'].iloc[-2]
-            color_t = "inverse" if dif > 0 else "normal"
-            st.info(f"📈 **Tendencia:** {'Subiste' if dif > 0 else 'Bajaste'} {abs(dif):.1f}kg desde la última vez.")
+            st.info(f"📊 **Tendencia:** {'Subiste' if dif > 0 else 'Bajaste'} {abs(dif):.1f}kg respecto al domingo anterior.")
 
         cal_hoy = sum(i['c'] for i in st.session_state.carrito_comida)
         prot_hoy = sum(i['p'] for i in st.session_state.carrito_comida)
+        agua_acumulada = st.session_state[f'agua_hoy_{usuario}']
         
         c1, c2, c3 = st.columns(3)
-        c1.metric("🔥 Calorías Hoy", f"{int(cal_hoy)} / {datos_p['cal_meta']} kcal")
-        c2.metric("🥩 Proteína Hoy", f"{int(prot_hoy)}g", f"Meta: {datos_p['prot_meta']}g")
-        c3.metric("💧 Meta Agua", f"{datos_p['agua_meta']} vasos")
+        c1.metric("🔥 Kcal Acumuladas", f"{int(cal_hoy)}", f"Meta: {datos_p['cal_meta']}")
+        c2.metric("🥩 Proteína Total", f"{int(prot_hoy)}g", f"Meta: {datos_p['prot_meta']}g")
+        
+        # Color del agua según meta
+        estado_agua = "normal" if agua_acumulada >= datos_p['agua_meta'] else "inverse"
+        c3.metric("💧 Agua Tomada", f"{agua_acumulada} vasos", f"Meta: {datos_p['agua_meta']}", delta_color=estado_agua)
 
         st.divider()
+
         col_in, col_res = st.columns([1, 1.2])
         
         with col_in:
-            st.subheader("📝 Registro")
-            modo = st.radio("Tipo:", ["Lista Peruana", "Manual"], horizontal=True)
-            if modo == "Lista Peruana":
-                com = st.selectbox("Alimento:", list(alimentos_peru.keys()))
-                can = st.number_input("Cantidad:", 1.0, step=0.5)
-                if st.button("➕ Añadir"):
-                    st.session_state.carrito_comida.append({"n": com, "c": alimentos_peru[com]['cal']*can, "p": alimentos_peru[com]['prot']*can})
+            st.subheader("➕ Agregar Consumo")
+            
+            # 1. AGUA INCREMENTAL
+            st.write("**Registro de Hidratación**")
+            c_agua1, c_agua2 = st.columns(2)
+            if c_agua1.button("➕ Tomé 1 Vaso"):
+                st.session_state[f'agua_hoy_{usuario}'] += 1
+                st.rerun()
+            if c_agua2.button("🧹 Reiniciar Agua"):
+                st.session_state[f'agua_hoy_{usuario}'] = 0
+                st.rerun()
+
+            st.divider()
+
+            # 2. COMIDA MANUAL (Sin opciones rígidas)
+            st.write("**Registro de Comida**")
+            n_m = st.text_input("¿Qué comiste? (Ej: Desayuno - Avena con huevo)")
+            col_c1, col_c2 = st.columns(2)
+            c_m = col_c1.number_input("Calorías (kcal):", min_value=0, step=10)
+            p_m = col_c2.number_input("Proteína (g):", min_value=0, step=1)
+            
+            if st.button("➕ Agregar al resumen del día", use_container_width=True):
+                if n_m:
+                    st.session_state.carrito_comida.append({"n": n_m, "c": c_m, "p": p_m})
+                    st.success(f"Añadido: {n_m}")
                     st.rerun()
-            else:
-                n_m = st.text_input("Nombre:")
-                c_m = st.number_input("Kcal:", 0)
-                p_m = st.number_input("Prot:", 0)
-                if st.button("➕ Añadir Manual"):
-                    st.session_state.carrito_comida.append({"n": n_m, "c": c_m, "p": p_m}); st.rerun()
 
-            v_agua = st.slider("Vasos de agua tomados:", 0, 15, 0)
+            st.divider()
             n_peso = st.number_input("⚖️ Peso actual (kg):", value=float(ultimo_peso))
-            f_reg = st.date_input("📅 Fecha:", datetime.now())
-
-            if st.button("💾 GUARDAR Y SUBIR PODER", type="primary", use_container_width=True):
-                detalles = ", ".join([i['n'] for i in st.session_state.carrito_comida]) if st.session_state.carrito_comida else "Solo Peso/Agua"
-                fila = pd.DataFrame({"Usuario": [usuario], "Fecha": [str(f_reg)], "Peso": [n_peso], "Calorias": [cal_hoy], "Proteinas": [prot_hoy], "Detalle": [detalles], "Vasos_Agua": [v_agua]})
-                conn.update(data=pd.concat([df_total, fila], ignore_index=True))
-                st.session_state.carrito_comida = []
-                st.success("¡Sincronizado! Has subido el poder familiar.")
-                time.sleep(1); st.rerun()
+            f_reg = st.date_input("📅 Fecha de hoy:", datetime.now())
 
         with col_res:
-            st.subheader("🍽️ Tu Plato")
+            st.subheader("📋 Resumen Acumulado del Día")
             if st.session_state.carrito_comida:
-                st.table(pd.DataFrame(st.session_state.carrito_comida))
-            else: st.info("Plato vacío.")
-            if not df_u.empty:
-                st.divider(); st.write("📉 Tu Peso")
-                st.line_chart(df_u, x="Fecha", y="Peso")
+                temp_df = pd.DataFrame(st.session_state.carrito_comida)
+                st.dataframe(temp_df.rename(columns={'n':'Descripción','c':'kcal','p':'Prot(g)'}), use_container_width=True)
+                
+                if st.button("🗑️ Borrar último registro"):
+                    st.session_state.carrito_comida.pop()
+                    st.rerun()
+            else:
+                st.info("Aún no has anotado comidas hoy. Los datos se guardarán localmente hasta que cierres el día.")
+
+            st.divider()
+            # 3. BOTÓN FINAL DE SINCRONIZACIÓN
+            st.warning("⚠️ Presiona aquí solo al FINAL DEL DÍA para subir todo al Excel:")
+            if st.button("🚀 FINALIZAR Y GUARDAR TODO EN NUBE", type="primary", use_container_width=True):
+                detalles = ", ".join([i['n'] for i in st.session_state.carrito_comida]) if st.session_state.carrito_comida else "Solo Registro Diario"
+                fila = pd.DataFrame({
+                    "Usuario": [usuario], 
+                    "Fecha": [str(f_reg)], 
+                    "Peso": [n_peso], 
+                    "Calorias": [cal_hoy], 
+                    "Proteinas": [prot_hoy], 
+                    "Detalle": [detalles], 
+                    "Vasos_Agua": [agua_acumulada]
+                })
+                df_final = pd.concat([df_total, fila], ignore_index=True)
+                conn.update(data=df_final)
+                
+                # Resetear todo para el día siguiente
+                st.session_state.carrito_comida = []
+                st.session_state[f'agua_hoy_{usuario}'] = 0
+                st.success("✅ ¡Día completado y guardado en Google Sheets!")
+                time.sleep(2)
+                st.rerun()
 
     # --- SECCIÓN ENTRENAMIENTO ---
     elif opcion == "💪 Entrenamiento & Recuperación":
