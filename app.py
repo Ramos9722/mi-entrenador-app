@@ -183,4 +183,4 @@ if usuario != "Seleccionar...":
     # --- GRÁFICAS AL FINAL ---
     if not df_usuario.empty:
         st.divider(); st.subheader("📈 Tu Evolución")
-        st.line_chart(df_usuario, x="Fecha", y="Peso")"Peso")
+        st.line_chart(df_usuario, x="Fecha", y="Peso")
