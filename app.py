@@ -6,7 +6,7 @@ import random
 from datetime import datetime
 
 # 1. CONFIGURACIÓN
-st.set_page_config(page_title="Family Coach GOLD v8.1", page_icon="🏆", layout="wide")
+st.set_page_config(page_title="Family Coach - ELITE v9.1", page_icon="🏆", layout="wide")
 
 perfiles = {
     "Anderson": {"estatura": 1.57, "edad": 22, "nivel": "Elite", "cal_meta": 2200, "agua_meta": 10, "prot_meta": 110},
@@ -38,133 +38,123 @@ banco_ejercicios = {
 }
 
 # --- SESIÓN ---
-for key in ['ejercicio_actual', 'entrenando', 'fase', 'carrito_comida', 'rutina_dia']:
-    if key not in st.session_state:
-        if key == 'fase': st.session_state[key] = "Calentamiento"
-        elif key == 'ejercicio_actual': st.session_state[key] = 0
-        elif key == 'entrenando': st.session_state[key] = False
-        else: st.session_state[key] = []
+if 'ejercicio_actual' not in st.session_state: st.session_state.ejercicio_actual = 0
+if 'entrenando' not in st.session_state: st.session_state.entrenando = False
+if 'fase' not in st.session_state: st.session_state.fase = "Calentamiento"
 
-# Conexión mejorada: ttl de 5 segundos para evitar bloqueos de Google API
 conn = st.connection("gsheets", type=GSheetsConnection)
-
-try:
-    df_total = conn.read(ttl=5)
-except Exception:
-    st.error("⚠️ Error de conexión con Google Sheets. Reintentando...")
-    time.sleep(2)
-    st.rerun()
+df_total = conn.read(ttl=0)
 
 # --- BARRA DE PODER ---
 st.markdown("### ⚡ Barra de Poder Familiar")
 hoy_str = datetime.now().strftime('%Y-%m-%d')
-usuarios_activos = df_total[df_total['Fecha'] == hoy_str]['Usuario'].nunique() if not df_total.empty else 0
-st.progress(usuarios_activos / len(perfiles))
+activos = df_total[df_total['Fecha'] == hoy_str]['Usuario'].nunique() if not df_total.empty else 0
+st.progress(activos / len(perfiles))
 
 usuario = st.selectbox("👤 ¿Quién eres?", ["Seleccionar..."] + list(perfiles.keys()))
 
 if usuario != "Seleccionar...":
     datos_p = perfiles[usuario]
-    if f'agua_hoy_{usuario}' not in st.session_state: st.session_state[f'agua_hoy_{usuario}'] = 0
     
-    df_u = df_total[df_total['Usuario'] == usuario].copy() if not df_total.empty else pd.DataFrame()
-    ultimo_peso = df_u['Peso'].iloc[-1] if not df_u.empty else 60.0
-
-    opcion = st.sidebar.radio("Menú:", ["🍎 Nutrición e Historial", "💪 Entrenamiento IA Pro"])
-
-    if opcion == "🍎 Nutrición e Historial":
-        st.header(f"Salud de {usuario}")
+    # --- RECUPERACIÓN DE DATOS (Persistencia) ---
+    if not df_total.empty:
+        df_u_todo = df_total[df_total['Usuario'] == usuario].copy()
+        df_hoy = df_u_todo[df_u_todo['Fecha'] == hoy_str]
         
-        cal_hoy = sum(i['c'] for i in st.session_state.carrito_comida)
-        prot_hoy = sum(i['p'] for i in st.session_state.carrito_comida)
-        agua_hoy = st.session_state[f'agua_hoy_{usuario}']
+        cal_hoy = df_hoy['Calorias'].sum()
+        prot_hoy = df_hoy['Proteinas'].sum()
+        agua_hoy = df_hoy['Vasos_Agua'].sum()
+        ultimo_peso = df_u_todo['Peso'].iloc[-1] if not df_u_todo.empty else 60.0
+    else:
+        df_u_todo = pd.DataFrame()
+        cal_hoy, prot_hoy, agua_hoy, ultimo_peso = 0, 0, 0, 60.0
+
+    opcion = st.sidebar.radio("Menú:", ["🍎 Nutrición y Estadísticas", "💪 Entrenamiento IA Pro"])
+
+    if opcion == "🍎 Nutrición y Estadísticas":
+        st.header(f"Salud de {usuario}")
         
         c1, c2, c3 = st.columns(3)
         c1.metric("🔥 Kcal Hoy", f"{int(cal_hoy)}", f"Meta: {datos_p['cal_meta']}")
         c2.metric("🥩 Prot Hoy", f"{int(prot_hoy)}g", f"Meta: {datos_p['prot_meta']}g")
-        c3.metric("💧 Agua Hoy", f"{agua_hoy} vasos", f"Meta: {datos_p['agua_meta']}")
+        c3.metric("💧 Agua Hoy", f"{int(agua_hoy)} vasos", f"Meta: {datos_p['agua_meta']}")
 
         st.divider()
         col_in, col_res = st.columns([1, 1.2])
         
         with col_in:
-            st.subheader("➕ Añadir Consumo")
-            if st.button("➕ Tomé 1 Vaso de Agua"): 
-                st.session_state[f'agua_hoy_{usuario}'] += 1
+            st.subheader("➕ Registro Rápido")
+            if st.button("💧 Añadir 1 Vaso de Agua"):
+                nueva = pd.DataFrame({"Usuario":[usuario],"Fecha":[hoy_str],"Peso":[ultimo_peso],"Calorias":[0],"Proteinas":[0],"Detalle":["Agua"],"Vasos_Agua":[1]})
+                conn.update(data=pd.concat([df_total, nueva], ignore_index=True))
                 st.rerun()
             
             st.write("---")
-            n_m = st.text_input("¿Qué comiste? (ej: Almuerzo - Pollo)")
+            n_m = st.text_input("¿Qué comiste? (ej: Almuerzo)")
             cc1, cc2 = st.columns(2)
             c_m = cc1.number_input("Kcal:", min_value=0)
             p_m = cc2.number_input("Prot(g):", min_value=0)
-            if st.button("➕ Agregar al Resumen Temporal"):
-                if n_m: 
-                    st.session_state.carrito_comida.append({"n": n_m, "c": c_m, "p": p_m})
+            if st.button("💾 Guardar Alimento"):
+                if n_m:
+                    nueva = pd.DataFrame({"Usuario":[usuario],"Fecha":[hoy_str],"Peso":[ultimo_peso],"Calorias":[c_m],"Proteinas":[p_m],"Detalle":[n_m],"Vasos_Agua":[0]})
+                    conn.update(data=pd.concat([df_total, nueva], ignore_index=True))
                     st.rerun()
 
             st.divider()
-            n_peso = st.number_input("⚖️ Peso (kg):", value=float(ultimo_peso))
-            f_reg = st.date_input("📅 Fecha:", datetime.now())
-
-            if st.button("🚀 FINALIZAR Y GUARDAR DÍA", type="primary", use_container_width=True):
-                detalles = ", ".join([i['n'] for i in st.session_state.carrito_comida]) if st.session_state.carrito_comida else "Solo Registro"
-                fila = pd.DataFrame({"Usuario": [usuario], "Fecha": [f_reg.strftime('%Y-%m-%d')], "Peso": [n_peso], "Calorias": [cal_hoy], "Proteinas": [prot_hoy], "Detalle": [detalles], "Vasos_Agua": [agua_hoy]})
-                actualizado = pd.concat([df_total, fila], ignore_index=True)
-                conn.update(data=actualizado)
-                st.session_state.carrito_comida = []
-                st.session_state[f'agua_hoy_{usuario}'] = 0
-                st.success("✅ Guardado en la nube.")
-                time.sleep(1); st.rerun()
+            n_peso = st.number_input("⚖️ Actualizar Peso (kg):", value=float(ultimo_peso))
+            if st.button("⚖️ Guardar Peso"):
+                nueva = pd.DataFrame({"Usuario":[usuario],"Fecha":[hoy_str],"Peso":[n_peso],"Calorias":[0],"Proteinas":[0],"Detalle":["Peso"],"Vasos_Agua":[0]})
+                conn.update(data=pd.concat([df_total, nueva], ignore_index=True))
+                st.success("Peso guardado."); st.rerun()
 
         with col_res:
-            st.subheader("📋 Resumen Temporal")
-            if st.session_state.carrito_comida:
-                st.table(pd.DataFrame(st.session_state.carrito_comida))
-                if st.button("🗑️ Vaciar Plato"): 
-                    st.session_state.carrito_comida = []; st.rerun()
-            else: st.info("Plato vacío. Los datos se guardan al final del día.")
+            st.subheader("📋 Resumen de Hoy")
+            if not df_hoy.empty:
+                st.dataframe(df_hoy[['Detalle', 'Calorias', 'Proteinas', 'Vasos_Agua']], use_container_width=True)
+            else: st.info("Sin registros hoy.")
 
+        # --- 📈 SECCIÓN DE ESTADÍSTICAS (Añadida) ---
         st.divider()
-        st.subheader("📊 Evolución")
-        if not df_u.empty:
-            df_u['Fecha'] = pd.to_datetime(df_u['Fecha'])
-            df_u = df_u.sort_values('Fecha')
-            st.line_chart(df_u, x="Fecha", y="Peso")
-        else: st.info("Sin historial aún.")
+        st.subheader("📊 Análisis de Progreso")
+        if not df_u_todo.empty:
+            df_u_todo['Fecha'] = pd.to_datetime(df_u_todo['Fecha'])
+            df_u_todo = df_u_todo.sort_values('Fecha')
+            
+            t1, t2 = st.tabs(["📉 Gráfica de Peso", "📅 Historial Completo"])
+            with t1:
+                st.line_chart(df_u_todo, x="Fecha", y="Peso")
+            with t2:
+                st.dataframe(df_u_todo[["Fecha", "Peso", "Calorias", "Proteinas", "Vasos_Agua", "Detalle"]], use_container_width=True)
+        else:
+            st.warning("Aún no hay datos históricos para graficar.")
 
-    # --- SECCIÓN ENTRENAMIENTO ---
-    elif opcion == "💪 Entrenamiento & Recuperación":
-        st.header("🤖 Motor de Entrenamiento IA Pro")
-        
-        with st.expander("🧠 IA de Recuperación", expanded=True):
+    elif opcion == "💪 Entrenamiento IA Pro":
+        st.header(f"Rutina IA para {usuario}")
+        with st.expander("🧠 IA de Recuperación"):
             sueño = st.select_slider("¿Cómo dormiste?", options=range(1,11), value=8)
-            dolor = st.select_slider("¿Dolor muscular?", options=range(0,11), value=2)
-            f_descanso = 2 if (sueño < 6 or dolor > 7) else 1
-            if f_descanso == 2: st.warning("IA: Fatiga alta detectada. Descansos duplicados.")
-            else: st.success("IA: Cuerpo en óptimas condiciones.")
+            dolor = st.select_slider("¿Dolor?", options=range(0,11), value=2)
+            f_desc = 2 if (sueño < 6 or dolor > 7) else 1
 
-        if dia_nombre == "Sunday":
-            st.warning("🏆 ¡DOMINGO DE MEDICIÓN! El reto es pesar y 200 sentadillas.")
-        elif not st.session_state.entrenando:
-            if st.button("🚀 INICIAR RUTINA ADAPTATIVA"):
-                random.seed(usuario + dia_nombre)
+        if not st.session_state.entrenando:
+            if st.button("🚀 INICIAR ENTRENAMIENTO"):
+                random.seed(usuario + hoy_str)
                 st.session_state.rutina_dia = random.sample(banco_ejercicios[datos_p["nivel"]], 5)
-                st.session_state.entrenando = True; st.session_state.fase = "Calentamiento"; st.rerun()
+                st.session_state.entrenando = True
+                st.session_state.fase = "Calentamiento"
+                st.session_state.ejercicio_actual = 0
+                st.rerun()
         else:
             if st.session_state.fase == "Calentamiento":
                 st.subheader("🔥 Fase 1: Calentamiento")
-                if st.button("✅ Empezar"): st.session_state.fase = "Circuito"; st.rerun()
+                if st.button("✅ ¡Listo! Empezar"): st.session_state.fase = "Circuito"; st.rerun()
             elif st.session_state.fase == "Circuito":
                 ej = st.session_state.rutina_dia[st.session_state.ejercicio_actual]
                 st.markdown(f"## {ej['icon']} {ej['n']}")
-                st.caption(f"Guía: {ej['guia']}")
                 if ej['t'] == 'reps':
                     st.write(f"🔢 Reps: **{ej['v']}**")
-                    if st.button("✅ HECHO"):
+                    if st.button("✅ SIGUIENTE"):
                         with st.empty():
-                            for s in range(ej['d']*f_descanso, 0, -1):
-                                st.warning(f"⏳ Descanso IA: {s}s"); time.sleep(1)
+                            for s in range(ej['d']*f_desc, 0, -1): st.warning(f"⏳ Descanso: {s}s"); time.sleep(1)
                         st.session_state.ejercicio_actual += 1
                         if st.session_state.ejercicio_actual >= 5: st.session_state.fase = "Estiramiento"
                         st.rerun()
@@ -172,11 +162,10 @@ if usuario != "Seleccionar...":
                     st.write(f"⏱️ Tiempo: **{ej['v']}s**")
                     if st.button("▶️ START"):
                         with st.empty():
-                            for s in range(ej['v'], 0, -1):
-                                st.error(f"🔥 ¡DALE! {s}s"); time.sleep(1)
+                            for s in range(ej['v'], 0, -1): st.error(f"🔥 {s}s"); time.sleep(1)
                         st.session_state.ejercicio_actual += 1
                         if st.session_state.ejercicio_actual >= 5: st.session_state.fase = "Estiramiento"
                         st.rerun()
             elif st.session_state.fase == "Estiramiento":
-                st.success("🧘 ¡Felicidades!"); st.balloons()
-                if st.button("🏆 TERMINAR"): st.session_state.entrenando = False; st.session_state.ejercicio_actual = 0; st.rerun()
+                st.success("🧘 Finalizado."); st.balloons()
+                if st.button("🏆 TERMINAR"): st.session_state.entrenando = False; st.rerun()
