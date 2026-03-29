@@ -83,36 +83,33 @@ if usuario != "Seleccionar...":
     if opcion == "🍎 Nutrición e IA de Peso":
         st.header(f"Gestión de Salud - {usuario}")
 
-        # --- INICIALIZACIÓN DE MEMORIA TEMPORAL (Si no existe) ---
+        # 1. FORZAR LECTURA FRESCA DEL EXCEL (Para ver cambios al instante)
+        # Esto asegura que no se "pise" la información vieja
+        df_total = conn.read(ttl=0) 
+        df_u = df_total[df_total['Usuario'] == usuario].copy() if not df_total.empty else pd.DataFrame()
+
+        # --- MEMORIA TEMPORAL ---
         if f'agua_hoy_{usuario}' not in st.session_state:
             st.session_state[f'agua_hoy_{usuario}'] = 0
         
-        # --- TENDENCIA Y MÉTRICAS ---
-        if len(df_u) >= 2:
-            dif = df_u['Peso'].iloc[-1] - df_u['Peso'].iloc[-2]
-            st.info(f"📊 **Tendencia:** {'Subiste' if dif > 0 else 'Bajaste'} {abs(dif):.1f}kg respecto al domingo anterior.")
-
         cal_hoy = sum(i['c'] for i in st.session_state.carrito_comida)
         prot_hoy = sum(i['p'] for i in st.session_state.carrito_comida)
         agua_acumulada = st.session_state[f'agua_hoy_{usuario}']
-        
+
+        # --- PANEL DE MÉTRICAS ACTUALES ---
         c1, c2, c3 = st.columns(3)
         c1.metric("🔥 Kcal Acumuladas", f"{int(cal_hoy)}", f"Meta: {datos_p['cal_meta']}")
         c2.metric("🥩 Proteína Total", f"{int(prot_hoy)}g", f"Meta: {datos_p['prot_meta']}g")
-        
-        # Color del agua según meta
-        estado_agua = "normal" if agua_acumulada >= datos_p['agua_meta'] else "inverse"
-        c3.metric("💧 Agua Tomada", f"{agua_acumulada} vasos", f"Meta: {datos_p['agua_meta']}", delta_color=estado_agua)
+        c3.metric("💧 Agua Tomada", f"{agua_acumulada} vasos", f"Meta: {datos_p['agua_meta']}")
 
         st.divider()
 
         col_in, col_res = st.columns([1, 1.2])
         
         with col_in:
-            st.subheader("➕ Agregar Consumo")
+            st.subheader("➕ Registro de Hoy")
             
-            # 1. AGUA INCREMENTAL
-            st.write("**Registro de Hidratación**")
+            # Registro de Agua
             c_agua1, c_agua2 = st.columns(2)
             if c_agua1.button("➕ Tomé 1 Vaso"):
                 st.session_state[f'agua_hoy_{usuario}'] += 1
@@ -121,60 +118,82 @@ if usuario != "Seleccionar...":
                 st.session_state[f'agua_hoy_{usuario}'] = 0
                 st.rerun()
 
-            st.divider()
-
-            # 2. COMIDA MANUAL (Sin opciones rígidas)
-            st.write("**Registro de Comida**")
-            n_m = st.text_input("¿Qué comiste? (Ej: Desayuno - Avena con huevo)")
-            col_c1, col_c2 = st.columns(2)
-            c_m = col_c1.number_input("Calorías (kcal):", min_value=0, step=10)
-            p_m = col_c2.number_input("Proteína (g):", min_value=0, step=1)
+            # Registro de Comida
+            n_m = st.text_input("¿Qué comiste ahora?")
+            cc1, cc2 = st.columns(2)
+            c_m = cc1.number_input("Kcal:", min_value=0, step=10)
+            p_m = cc2.number_input("Prot(g):", min_value=0, step=1)
             
-            if st.button("➕ Agregar al resumen del día", use_container_width=True):
+            if st.button("➕ Añadir al Plato del Día", use_container_width=True):
                 if n_m:
                     st.session_state.carrito_comida.append({"n": n_m, "c": c_m, "p": p_m})
-                    st.success(f"Añadido: {n_m}")
                     st.rerun()
 
             st.divider()
             n_peso = st.number_input("⚖️ Peso actual (kg):", value=float(ultimo_peso))
-            f_reg = st.date_input("📅 Fecha de hoy:", datetime.now())
+            f_reg = st.date_input("📅 Fecha de este registro:", datetime.now())
 
-        with col_res:
-            st.subheader("📋 Resumen Acumulado del Día")
-            if st.session_state.carrito_comida:
-                temp_df = pd.DataFrame(st.session_state.carrito_comida)
-                st.dataframe(temp_df.rename(columns={'n':'Descripción','c':'kcal','p':'Prot(g)'}), use_container_width=True)
+            # BOTÓN DE GUARDADO DEFINITIVO (Crea nueva fila)
+            if st.button("🚀 FINALIZAR Y GUARDAR DÍA (Crea Nueva Fila)", type="primary", use_container_width=True):
+                detalles = ", ".join([i['n'] for i in st.session_state.carrito_comida]) if st.session_state.carrito_comida else "Solo Peso/Agua"
                 
-                if st.button("🗑️ Borrar último registro"):
-                    st.session_state.carrito_comida.pop()
-                    st.rerun()
-            else:
-                st.info("Aún no has anotado comidas hoy. Los datos se guardarán localmente hasta que cierres el día.")
-
-            st.divider()
-            # 3. BOTÓN FINAL DE SINCRONIZACIÓN
-            st.warning("⚠️ Presiona aquí solo al FINAL DEL DÍA para subir todo al Excel:")
-            if st.button("🚀 FINALIZAR Y GUARDAR TODO EN NUBE", type="primary", use_container_width=True):
-                detalles = ", ".join([i['n'] for i in st.session_state.carrito_comida]) if st.session_state.carrito_comida else "Solo Registro Diario"
-                fila = pd.DataFrame({
+                # Creamos el nuevo registro
+                nueva_fila = pd.DataFrame({
                     "Usuario": [usuario], 
-                    "Fecha": [str(f_reg)], 
+                    "Fecha": [f_reg.strftime('%Y-%m-%d')], # Formato estándar de fecha
                     "Peso": [n_peso], 
                     "Calorias": [cal_hoy], 
                     "Proteinas": [prot_hoy], 
                     "Detalle": [detalles], 
                     "Vasos_Agua": [agua_acumulada]
                 })
-                df_final = pd.concat([df_total, fila], ignore_index=True)
-                conn.update(data=df_final)
                 
-                # Resetear todo para el día siguiente
+                # Unimos lo nuevo con lo viejo y subimos
+                actualizado = pd.concat([df_total, nueva_fila], ignore_index=True)
+                conn.update(data=actualizado)
+                
+                # Limpiamos para el día siguiente
                 st.session_state.carrito_comida = []
                 st.session_state[f'agua_hoy_{usuario}'] = 0
-                st.success("✅ ¡Día completado y guardado en Google Sheets!")
-                time.sleep(2)
+                st.success("✅ ¡Datos guardados exitosamente como una nueva entrada!")
+                time.sleep(1)
                 st.rerun()
+
+        with col_res:
+            st.subheader("📋 Resumen de Ingesta")
+            if st.session_state.carrito_comida:
+                st.table(pd.DataFrame(st.session_state.carrito_comida))
+            else:
+                st.info("No hay alimentos anotados aún.")
+
+        # --- 📈 PANEL DE ESTADÍSTICAS Y GRÁFICAS (SIEMPRE VISIBLE) ---
+        st.divider()
+        st.subheader(f"📊 Evolución Histórica: {usuario}")
+        
+        if not df_u.empty:
+            # Aseguramos que la fecha sea reconocida como tal para la gráfica
+            df_u['Fecha'] = pd.to_datetime(df_u['Fecha'])
+            df_u = df_u.sort_values('Fecha') # Ordenar por fecha para que la línea tenga sentido
+
+            tab1, tab2 = st.tabs(["📉 Gráfica de Peso", "📋 Historial Completo"])
+            
+            with tab1:
+                st.line_chart(df_u, x="Fecha", y="Peso")
+            
+            with tab2:
+                st.dataframe(df_u[["Fecha", "Peso", "Calorias", "Proteinas", "Vasos_Agua", "Detalle"]], use_container_width=True)
+                
+            # Analizador de Tendencia (Comparación entre las dos últimas filas)
+            if len(df_u) >= 2:
+                ultimo = df_u['Peso'].iloc[-1]
+                anterior = df_u['Peso'].iloc[-2]
+                cambio = ultimo - anterior
+                if cambio < 0:
+                    st.success(f"💪 ¡Genial! Has bajado {abs(cambio):.2f}kg desde tu último registro.")
+                elif cambio > 0:
+                    st.warning(f"⚠️ Has subido {cambio:.2f}kg. ¡A ajustar esa dieta!")
+        else:
+            st.warning("Aún no tienes registros guardados. ¡Guarda tu primer día para ver las gráficas!")
 
     # --- SECCIÓN ENTRENAMIENTO ---
     elif opcion == "💪 Entrenamiento & Recuperación":
