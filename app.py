@@ -5,9 +5,10 @@ import time
 import random
 from datetime import datetime
 
-# 1. CONFIGURACIÓN
+# 1. CONFIGURACIÓN DE PÁGINA
 st.set_page_config(page_title="Family Coach IA Total", page_icon="🤖", layout="wide")
 
+# 2. PERFILES (Corregido Sharon 1.40m y Metas)
 perfiles = {
     "Anderson": {"estatura": 1.57, "edad": 22, "nivel": "Elite", "cal_meta": 2200, "agua_meta": 10},
     "Emerson": {"estatura": 1.57, "edad": 22, "nivel": "Elite", "cal_meta": 2200, "agua_meta": 10},
@@ -49,16 +50,17 @@ banco_ejercicios = {
     ]
 }
 
-# --- LÓGICA DE SESIÓN ---
+# --- 3. LÓGICA DE SESIÓN ---
 if 'ejercicio_actual' not in st.session_state: st.session_state.ejercicio_actual = 0
 if 'entrenando' not in st.session_state: st.session_state.entrenando = False
 if 'fase' not in st.session_state: st.session_state.fase = "Calentamiento"
 if 'carrito_comida' not in st.session_state: st.session_state.carrito_comida = []
+if 'rutina_dia' not in st.session_state: st.session_state.rutina_dia = []
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 df_total = conn.read()
 
-# --- INTERFAZ ---
+# --- 4. INTERFAZ ---
 st.title("👨‍👩‍👧‍👦 Family Fitness Hub Pro")
 usuario = st.selectbox("👤 ¿Quién eres?", ["Seleccionar..."] + list(perfiles.keys()))
 
@@ -77,55 +79,41 @@ if usuario != "Seleccionar...":
     opcion = st.sidebar.radio("Ir a:", ["🍎 Nutrición y Peso", "💪 Entrenamiento IA Pro"])
 
     # --- SECCIÓN NUTRICIÓN ---
-if opcion == "🍎 Nutrición y Peso":
+    if opcion == "🍎 Nutrición y Peso":
         st.header(f"Gestión Nutricional - {usuario}")
         
-        # --- CÁLCULO DE PROGRESO ---
         cal_consumidas = sum(item['c'] for item in st.session_state.carrito_comida)
         cal_restantes = datos_p['cal_meta'] - cal_consumidas
         
-        # --- MÉTRICAS E INTELIGENCIA ---
         m1, m2, m3 = st.columns(3)
-        
-        # Alerta de Calorías con Delta
         if cal_consumidas > datos_p['cal_meta']:
             exceso = int(cal_consumidas - datos_p['cal_meta'])
             m1.metric("🔥 Calorías Hoy", f"{int(cal_consumidas)} kcal", f"Exceso: {exceso}", delta_color="inverse")
             st.error(f"⚠️ ¡Cuidado {usuario}! Has superado tu meta por {exceso} kcal.")
         else:
             m1.metric("🍎 Calorías Hoy", f"{int(cal_consumidas)} kcal", f"Faltan: {int(cal_restantes)}")
-
         m2.metric("🎯 Tu Meta", f"{datos_p['cal_meta']} kcal")
         m3.metric("💧 Meta Agua", f"{datos_p['agua_meta']} vasos")
 
         st.divider()
 
         col_in, col_res = st.columns([1, 1.2])
-        
         with col_in:
-            st.subheader("📝 Registro de Alimentos")
-            with st.expander("➕ Añadir al Plato", expanded=True):
+            with st.expander("📝 Añadir al Plato", expanded=True):
                 mom = st.selectbox("Momento:", ["Desayuno", "Almuerzo", "Cena", "Snack"])
                 com = st.selectbox("Alimento:", list(alimentos_peru.keys()))
                 can = st.number_input(f"Cantidad ({alimentos_peru[com]['medida']})", min_value=0.5, step=0.5)
-                if st.button("Añadir"):
+                if st.button("➕ Añadir"):
                     info = alimentos_peru[com]
-                    st.session_state.carrito_comida.append({
-                        "m": mom, "n": com, "c": info["cal"] * can, "p": info["prot"] * can
-                    })
+                    st.session_state.carrito_comida.append({"m": mom, "n": com, "c": info["cal"] * can, "p": info["prot"] * can})
                     st.rerun()
             
-            st.subheader("💧 Registro de Agua")
-            # Slider dinámico que muestra el progreso contra la meta
             v_agua = st.slider(f"Vasos tomados (Meta: {datos_p['agua_meta']})", 0, 15, 0)
-            
             if v_agua >= datos_p['agua_meta']:
-                st.success(f"✅ ¡Excelente! Meta de agua alcanzada ({v_agua}/{datos_p['agua_meta']})")
+                st.success(f"✅ Meta de agua alcanzada ({v_agua}/{datos_p['agua_meta']})")
             else:
-                faltan = datos_p['agua_meta'] - v_agua
-                st.warning(f"🚰 Te faltan {faltan} vasos para estar bien hidratado.")
+                st.warning(f"🚰 Te faltan {datos_p['agua_meta'] - v_agua} vasos.")
 
-            st.divider()
             n_peso = st.number_input("⚖️ Peso actual (kg):", value=float(ultimo_peso), step=0.1)
             f_reg = st.date_input("📅 Fecha:", datetime.now())
 
@@ -133,13 +121,9 @@ if opcion == "🍎 Nutrición y Peso":
             st.subheader("🍽️ Resumen del Plato")
             if st.session_state.carrito_comida:
                 temp_df = pd.DataFrame(st.session_state.carrito_comida)
-                # Formatear tabla para que sea legible
                 st.dataframe(temp_df.rename(columns={'m':'Momento','n':'Alimento','c':'kcal','p':'Prot(g)'}), use_container_width=True)
-                
                 total_p = temp_df['p'].sum()
-                st.write(f"**Total Proteína:** {total_p:.1f}g")
-
-                if st.button("💾 GUARDAR TODO EL DÍA"):
+                if st.button("💾 GUARDAR DÍA COMPLETO"):
                     nueva_fila = pd.DataFrame({
                         "Usuario": [usuario], "Fecha": [str(f_reg)], "Peso": [n_peso],
                         "Calorias": [cal_consumidas], "Proteinas": [total_p],
@@ -147,16 +131,15 @@ if opcion == "🍎 Nutrición y Peso":
                     })
                     df_final = pd.concat([df_total, nueva_fila], ignore_index=True)
                     conn.update(data=df_final)
-                    st.session_state.carrito_comida = [] # Limpiar plato tras guardar
-                    st.success("✅ Datos sincronizados con Google Sheets.")
+                    st.session_state.carrito_comida = []
+                    st.success("¡Datos guardados!")
                     st.rerun()
-            else:
-                st.info("Aún no has registrado alimentos hoy. ¡Empieza añadiendo tu desayuno!")
+            else: st.info("Plato vacío.")
 
     # --- SECCIÓN ENTRENAMIENTO ---
     elif opcion == "💪 Entrenamiento IA Pro":
         if dia_nombre == "Sunday":
-            st.warning("🏆 ¡DOMINGO DE MEDICIÓN! Registra tu peso en la sección Nutrición.")
+            st.warning("🏆 ¡DOMINGO DE MEDICIÓN! Registra tu peso en Nutrición.")
         elif not st.session_state.entrenando:
             st.header(f"Tu Rutina IA - {dia_nombre}")
             if st.button("🚀 INICIAR SESIÓN"):
@@ -172,13 +155,15 @@ if opcion == "🍎 Nutrición y Peso":
                 if st.button("✅ Empezar Circuito"):
                     st.session_state.fase = "Circuito"; st.rerun()
             elif st.session_state.fase == "Circuito":
+                prog = st.session_state.ejercicio_actual / len(st.session_state.rutina_dia)
+                st.progress(prog)
                 ej = st.session_state.rutina_dia[st.session_state.ejercicio_actual]
                 st.markdown(f"## {ej['icon']} {ej['n']}")
                 st.info(f"Técnica: {ej['guia']}")
                 if ej['t'] == 'reps':
                     st.write(f"🔢 Repeticiones: **{ej['v']}**")
                     if st.button("✅ SIGUIENTE"):
-                        time.sleep(ej['d']); st.session_state.ejercicio_actual += 1
+                        time.sleep(1); st.session_state.ejercicio_actual += 1
                         if st.session_state.ejercicio_actual >= 5: st.session_state.fase = "Estiramiento"
                         st.rerun()
                 else:
@@ -193,9 +178,9 @@ if opcion == "🍎 Nutrición y Peso":
             elif st.session_state.fase == "Estiramiento":
                 st.success("🧘 Fase final: Estiramientos estáticos."); st.balloons()
                 if st.button("🏆 FINALIZAR"):
-                    st.session_state.entrenando = False; st.rerun()
+                    st.session_state.entrenando = False; st.session_state.ejercicio_actual = 0; st.rerun()
 
     # --- GRÁFICAS AL FINAL ---
     if not df_usuario.empty:
         st.divider(); st.subheader("📈 Tu Evolución")
-        st.line_chart(df_usuario, x="Fecha", y="Peso")
+        st.line_chart(df_usuario, x="Fecha", y="Peso")"Peso")
