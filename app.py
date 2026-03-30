@@ -259,7 +259,7 @@ for key in ['ejercicio_actual', 'entrenando', 'fase', 'rutina_dia', 'f_descanso'
 conn = st.connection("gsheets", type=GSheetsConnection)
 df_total = conn.read(ttl=0)
 
-st.title("🏆 Family Fitness ULTRA v12")
+st.title("🏆 CONTROL FAMILIAR PESO")
 
 # --- RANKING FAMILIAR IMC ---
 with st.expander("📊 Ranking Familiar IMC", expanded=False):
@@ -276,16 +276,48 @@ usuario = st.selectbox("👤 ¿Quién eres?", ["Seleccionar..."] + list(perfiles
 
 if usuario != "Seleccionar...":
     datos_p = perfiles[usuario]
+    hoy_str = datetime.now().strftime('%Y-%m-%d')
+    
+    # 1. Recuperación de datos desde el Excel
     df_u = df_total[df_total['Usuario'] == usuario].copy() if not df_total.empty else pd.DataFrame()
     u_peso = df_u['Peso'].iloc[-1] if not df_u.empty else 0.0
+    
+    # 2. Cálculo de IMC Actual
+    # Fórmula: Peso / (Estatura * Estatura)
     imc_act = round(u_peso / (datos_p['estatura']**2), 1) if u_peso > 0 else 0.0
-    p_meta = round(22 * (datos_p['estatura']**2), 1)
+    
+    # 3. LÓGICA DE METAS (Diferenciada por edad/tabla OMS)
+    if usuario == "Sharon":
+        # Basado en la Tabla OMS 2007 para Niñas de 11 años:
+        # Rango Normal: 13.9 a 19.9. Meta = Promedio (16.9)
+        imc_min, imc_max = 13.9, 19.9
+        imc_meta = 16.9
+    else:
+        # Estándar para Adultos (Anderson, Emerson, Jhon, Nelida):
+        # Rango Normal: 18.5 a 24.9. Meta = 22.0
+        imc_min, imc_max = 18.5, 24.9
+        imc_meta = 22.0
 
+    # 4. Cálculo de Peso Objetivo basado en la Meta
+    p_meta = round(imc_meta * (datos_p['estatura']**2), 1)
+    dif_kilos = round(u_peso - p_meta, 1)
+
+    # 5. Visualización de Métricas Principales
     st.divider()
     m1, m2, m3 = st.columns(3)
-    m1.metric("⚖️ PESO", f"{u_peso} kg")
-    m2.metric("📊 IMC", f"{imc_act}", delta_color="normal" if 18.5 <= imc_act <= 24.9 else "inverse")
-    m3.metric("🎯 META (IMC 22)", f"{p_meta} kg", f"{round(u_peso - p_meta, 1)} kg de diferencia")
+    
+    with m1:
+        st.metric("⚖️ PESO ACTUAL", f"{u_peso} kg")
+        
+    with m2:
+        # El color cambia a rojo si se sale del rango ideal definido arriba
+        color_imc = "normal" if imc_min <= imc_act <= imc_max else "inverse"
+        st.metric("📊 IMC ACTUAL", f"{imc_act}", f"Ideal: {imc_min}-{imc_max}", delta_color=color_imc)
+        
+    with m3:
+        # Te dice cuántos kilos faltan o sobran para llegar al IMC Meta
+        mensaje_meta = f"Meta: IMC {imc_meta}"
+        st.metric("🎯 PESO OBJETIVO", f"{p_meta} kg", f"{dif_kilos} kg para el ideal", delta_color="inverse")
 
     st.divider()
     opcion = st.sidebar.radio("Menú:", ["📈 Registro e Historial", "💪 Entrenamiento IA Pro"])
